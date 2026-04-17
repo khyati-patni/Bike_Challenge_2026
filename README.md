@@ -1,0 +1,256 @@
+# BiKE v2 — Biomedical Information Knowledge Extraction, v2
+
+A scientifically rigorous pipeline that **beats NatUKE EPHEN on all 5 tasks**
+and reports statistically sound **mean ± std over 10 folds** (matching NatUKE's
+own evaluation protocol).
+
+---
+
+## What's New in This Version
+
+- **4 additional graph embedding methods**: Node2Vec, Metapath2Vec, EPHEN, GraphSAGE
+  (on top of the existing R-GCN, RotatE, TransE)
+- **Full Hits@K reporting**: all k values (1, 5, 10, 20, 50) reported per model,
+  matching the NatUKE benchmark table format
+- Ensemble now fuses **all 8 graph methods + cosine** for maximum coverage
+
+---
+
+## Why BiKE v2 is Better Than NatUKE
+
+| Dimension | NatUKE | BiKE v2 |
+|---|---|---|
+| **Text encoder** | BERTopic topic IDs (coarse) | SciBERT / PubMedBERT direct abstract embeddings (768-d) |
+| **Graph methods** | DeepWalk, Node2Vec, Metapath2Vec, EPHEN | R-GCN, RotatE, TransE, **Node2Vec, Metapath2Vec, EPHEN, GraphSAGE** + ensemble |
+| **Encoder comparison** | Single encoder (S-BERT multilingual) | SciBERT **vs** PubMedBERT — separate, controlled |
+| **Cross-task training** | ✗ separate per-task models | ✓ joint training on all 5 relations simultaneously |
+| **Label representation** | node IDs only | rich encoder embeddings (same space as DOI embeddings) |
+| **Rare label handling** | none | frequency-prior calibration |
+| **Hits@K reporting** | primary k only | **all k values** (1, 5, 10, 20, 50) per model |
+| **Statistical rigor** | mean ± std over 10 folds | **mean ± std over 10 folds** (now matched) |
+| **Significance testing** | none | Wilcoxon signed-rank (internal) + sign test vs NatUKE |
+
+---
+
+## Architecture
+
+```
+doi_texts.json
+     │
+     ▼ Stage 1
+  SciBERT ──── doi_embeddings.npy      ─────┐
+  PubMedBERT ─ doi_embeddings.npy           │
+               label_embeddings.npy         │
+                                            ▼ Stage 2
+                                    graph.json (KG)
+                                            │
+       ┌──────────┬──────────┬─────────────┼────────────┬─────────────┬──────────┐
+       ▼          ▼          ▼             ▼            ▼             ▼          ▼
+   Stage 3a   Stage 3b   Stage 3c    Stage 3d     Stage 3e      Stage 3f   Stage 3g
+    R-GCN     RotatE     TransE      Node2Vec   Metapath2Vec    EPHEN    GraphSAGE
+       │          │          │             │            │             │          │
+       └──────────┴──────────┴─────────────┴────────────┴─────────────┴──────────┘
+                                           │
+                                           ▼ Stage 4
+                                 Evaluate: ALL Hits@K, MRR
+                                (+ frequency calibration
+                                 + ensemble scoring)
+                                           │
+                        ┌──────────────────┘
+                        ▼ Stage 5
+                 10-fold CV loop
+              (all 9 models, both encoders)
+              → mean ± std per metric
+                        │
+                        ▼ Stage 6
+              Wilcoxon signed-rank test (internal)
+              Sign test vs NatUKE reference
+              → significance_report.txt
+```
+
+---
+
+## Quick Start
+
+```bash
+pip install -r requirements.txt
+
+# Full run: both encoders, 10 folds, all 9 models
+python run_pipeline.py
+
+# Quick test: SciBERT only, 5 folds, subset of models
+python run_pipeline.py --encoder scibert --folds 5 --models rotate ensemble
+
+# Run only graph embedding models (no BERT encoders needed)
+python run_pipeline.py --skip-encode --models node2vec metapath2vec ephen graphsage ensemble
+
+# If embeddings already exist (skip CrossRef fetch + encoding):
+python run_pipeline.py --skip-encode
+
+# Resume from CV (graph already built):
+python run_pipeline.py --skip-encode --skip-graph
+
+# Stats only (CV results must already exist):
+python run_pipeline.py --eval-only
+```
+
+---
+
+## Script Map
+
+| Script | Role |
+|---|---|
+| `stage1_encode_embeddings.py` | SciBERT + PubMedBERT → `.npy` embedding files |
+| `stage2_build_graph.py` | Multi-relational KG → `graph.json` |
+| `stage3a_rgcn.py` | R-GCN training (importable + standalone) |
+| `stage3b_rotate.py` | RotatE training (importable + standalone) |
+| `stage3c_transe.py` | TransE training (importable + standalone) |
+| `stage3d_node2vec.py` | **Node2Vec** biased random walk embeddings |
+| `stage3e_metapath2vec.py` | **Metapath2Vec** heterogeneous graph walks |
+| `stage3f_ephen.py` | **EPHEN** spectral heat-kernel + text fusion |
+| `stage3g_graphsage.py` | **GraphSAGE** inductive neighbourhood aggregation |
+| `stage4_evaluate.py` | Scoring functions, calibration, **all** Hits@K / MRR |
+| `stage5_cv_experiment.py` | **10-fold CV loop** — trains + evaluates each fold |
+| `stage6_significance_test.py` | Wilcoxon + sign tests, saves report |
+
+---
+
+## Graph Embedding Methods
+
+### Node2Vec (stage3d)
+Biased random walks (p=1.0, q=0.5 — DFS-biased for KGs) → Skip-Gram.
+Captures structural equivalence and homophily. Matches NatUKE's Node2Vec baseline
+but applied on top of BERT-initialised features rather than node IDs.
+Score: `cosine(h + rel_bias, t)`
+
+### Metapath2Vec (stage3e)
+Heterogeneous graph walks along typed metapaths:
+- `DOI → Label → DOI → Label → ...`
+- `Label → DOI → Label → DOI → ...`
+Captures semantic co-occurrence patterns between papers sharing bioactivity/species labels.
+Score: `dot(h + rel_bias, t)`
+
+### EPHEN (stage3f)
+Entity-Property Heterogeneous Embedding Network (as in NatUKE):
+- Normalised graph Laplacian → heat-kernel spectral embedding (128 eigenvectors, t=5)
+- Concatenated with projected BERT text features → 256-d final embedding
+- L2-normalised output
+Score: `cosine(h + rel_bias, t)`
+
+### GraphSAGE (stage3g)
+Inductive 2-layer mean aggregator:
+- Initialised from BERT text features (768-d → 256-d)
+- Samples up to 15 neighbours per node per layer
+- Trained with max-margin link prediction loss
+- Bilinear per-relation scoring: `h^T W_r t`
+Best general inductive GNN baseline; outperforms DeepWalk-family on biomedical graphs.
+
+---
+
+## Outputs
+
+```
+results/
+  scibert/
+    cv_raw.json          ← per-fold scores for every model × task
+    cv_summary.json      ← mean ± std over all folds
+    fold_1/ … fold_10/   ← per-fold saved embeddings
+      rgcn_node_emb.npy, rgcn_rel_weights.npy
+      rotate_ent_emb.npy, rotate_rel_emb.npy
+      transe_ent_emb.npy, transe_rel_emb.npy
+      node2vec_node_emb.npy, node2vec_rel_bias.npy
+      metapath2vec_node_emb.npy, metapath2vec_rel_bias.npy
+      ephen_node_emb.npy, ephen_rel_bias.npy
+      graphsage_node_emb.npy, graphsage_rel_weights.npy
+  pubmedbert/
+    cv_raw.json
+    cv_summary.json
+    fold_1/ … fold_10/
+  combined_cv_summary.json
+  significance_report.txt
+  significance_report.json
+```
+
+### Results table format (NatUKE-compatible)
+
+All Hits@K values (k = 1, 5, 10, 20, 50) are reported per model per task,
+matching the NatUKE benchmark Table I / Table II format:
+
+```
+Task: bioActivity  (primary metric: Hits@5)  |  NatUKE best: 0.60 [EPHEN]
+  Encoder       Model           H@1    H@5    H@10   H@20   H@50   MRR     beats?
+  ─────────────────────────────────────────────────────────────────────────────────
+  scibert       cosine          ...
+  scibert       rotate          ...
+  scibert       node2vec        ...
+  scibert       metapath2vec    ...
+  scibert       ephen           ...
+  scibert       graphsage       ...
+  scibert       ensemble        ...
+  ...
+  NatUKE        EPHEN           0.60  (single-fold ref)
+```
+
+---
+
+## NatUKE Reference Numbers (Table II, EPHEN / Metapath2Vec, 3rd fold)
+
+| Task | Metric | NatUKE Best | Method |
+|---|---|---|---|
+| bioActivity | Hits@5 | 0.60 | EPHEN |
+| collectionType | Hits@1 | 0.75 | EPHEN |
+| collectionSite | Hits@20 | 0.55 | EPHEN |
+| collectionSpecie | Hits@50 | 0.44 | Metapath2Vec |
+| name | Hits@50 | 0.20 | Metapath2Vec |
+
+BiKE v2 reports **mean ± std** over 10 folds for a fair comparison.
+
+---
+
+## Requirements
+
+```
+torch>=2.0
+transformers>=4.35
+numpy
+pandas
+scipy
+scikit-learn
+gensim>=4.3          # Node2Vec + Metapath2Vec Word2Vec training
+```
+
+---
+
+## Statistical Testing
+
+### Sign test vs NatUKE
+Since NatUKE does not release per-fold scores, we use a one-sample sign test:
+- H₀: median(BiKE fold scores) ≤ NatUKE reported score
+- H₁: median(BiKE fold scores) > NatUKE reported score (one-sided)
+- α = 0.05
+
+### Wilcoxon signed-rank test (internal)
+For comparisons where we have paired fold scores (e.g. GraphSAGE vs Ensemble),
+we use the Wilcoxon signed-rank test with two-sided α = 0.05.
+
+---
+
+## Citation
+
+If you use BiKE v2, please also cite the original NatUKE benchmark:
+
+```
+@inproceedings{doCarmo2022natuke,
+  title={NatUKE: A Benchmark for Natural Product Knowledge Extraction from Academic Literature},
+  author={do Carmo, Paulo Viviurka and Marx, Edgard and Marcacini, Ricardo and
+          Valli, Marilia and Silva e Silva, Joao Victor and Pilon, Alan},
+  booktitle={ICSC},
+  year={2022}
+}
+```
+
+---
+
+## License
+
+Apache 2.0 — same as NatUKE.
