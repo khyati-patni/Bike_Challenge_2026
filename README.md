@@ -1,5 +1,5 @@
 # BiKE v2 — Biomedical Information Knowledge Extraction, v2 by Team Graphminds
-
+Link for full repo : https://drive.google.com/drive/folders/1YQ1FWoT9Qpf0Ml7-5Snv6kz_QI2DqmTz?usp=drive_link
 
 ---
 
