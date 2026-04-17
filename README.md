@@ -14,24 +14,6 @@ own evaluation protocol).
   matching the NatUKE benchmark table format
 - Ensemble now fuses **all 8 graph methods + cosine** for maximum coverage
 
----
-
-## Why BiKE v2 is Better Than NatUKE
-
-| Dimension | NatUKE | BiKE v2 |
-|---|---|---|
-| **Text encoder** | BERTopic topic IDs (coarse) | SciBERT / PubMedBERT direct abstract embeddings (768-d) |
-| **Graph methods** | DeepWalk, Node2Vec, Metapath2Vec, EPHEN | R-GCN, RotatE, TransE, **Node2Vec, Metapath2Vec, EPHEN, GraphSAGE** + ensemble |
-| **Encoder comparison** | Single encoder (S-BERT multilingual) | SciBERT **vs** PubMedBERT — separate, controlled |
-| **Cross-task training** | ✗ separate per-task models | ✓ joint training on all 5 relations simultaneously |
-| **Label representation** | node IDs only | rich encoder embeddings (same space as DOI embeddings) |
-| **Rare label handling** | none | frequency-prior calibration |
-| **Hits@K reporting** | primary k only | **all k values** (1, 5, 10, 20, 50) per model |
-| **Statistical rigor** | mean ± std over 10 folds | **mean ± std over 10 folds** (now matched) |
-| **Significance testing** | none | Wilcoxon signed-rank (internal) + sign test vs NatUKE |
-
----
-
 ## Architecture
 
 ```
@@ -171,28 +153,6 @@ results/
   significance_report.json
 ```
 
-### Results table format (NatUKE-compatible)
-
-All Hits@K values (k = 1, 5, 10, 20, 50) are reported per model per task,
-matching the NatUKE benchmark Table I / Table II format:
-
-```
-Task: bioActivity  (primary metric: Hits@5)  |  NatUKE best: 0.60 [EPHEN]
-  Encoder       Model           H@1    H@5    H@10   H@20   H@50   MRR     beats?
-  ─────────────────────────────────────────────────────────────────────────────────
-  scibert       cosine          ...
-  scibert       rotate          ...
-  scibert       node2vec        ...
-  scibert       metapath2vec    ...
-  scibert       ephen           ...
-  scibert       graphsage       ...
-  scibert       ensemble        ...
-  ...
-  NatUKE        EPHEN           0.60  (single-fold ref)
-```
-
----
-
 ## NatUKE Reference Numbers (Table II, EPHEN / Metapath2Vec, 3rd fold)
 
 | Task | Metric | NatUKE Best | Method |
@@ -203,7 +163,7 @@ Task: bioActivity  (primary metric: Hits@5)  |  NatUKE best: 0.60 [EPHEN]
 | collectionSpecie | Hits@50 | 0.44 | Metapath2Vec |
 | name | Hits@50 | 0.20 | Metapath2Vec |
 
-BiKE v2 reports **mean ± std** over 10 folds for a fair comparison.
+
 
 ---
 
@@ -218,21 +178,6 @@ scipy
 scikit-learn
 gensim>=4.3          # Node2Vec + Metapath2Vec Word2Vec training
 ```
-
----
-
-## Statistical Testing
-
-### Sign test vs NatUKE
-Since NatUKE does not release per-fold scores, we use a one-sample sign test:
-- H₀: median(BiKE fold scores) ≤ NatUKE reported score
-- H₁: median(BiKE fold scores) > NatUKE reported score (one-sided)
-- α = 0.05
-
-### Wilcoxon signed-rank test (internal)
-For comparisons where we have paired fold scores (e.g. GraphSAGE vs Ensemble),
-we use the Wilcoxon signed-rank test with two-sided α = 0.05.
-
 ---
 
 ## Citation
