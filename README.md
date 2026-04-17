@@ -1,4 +1,4 @@
-# BiKE v2 — Biomedical Information Knowledge Extraction, v2
+# BiKE v2 — Biomedical Information Knowledge Extraction, v2 by Team Graphminds
 
 
 ---
