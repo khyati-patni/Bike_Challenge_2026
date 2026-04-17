@@ -97,37 +97,6 @@ python run_pipeline.py --eval-only
 
 ---
 
-## Graph Embedding Methods
-
-### Node2Vec (stage3d)
-Biased random walks (p=1.0, q=0.5 — DFS-biased for KGs) → Skip-Gram.
-Captures structural equivalence and homophily. Matches NatUKE's Node2Vec baseline
-but applied on top of BERT-initialised features rather than node IDs.
-Score: `cosine(h + rel_bias, t)`
-
-### Metapath2Vec (stage3e)
-Heterogeneous graph walks along typed metapaths:
-- `DOI → Label → DOI → Label → ...`
-- `Label → DOI → Label → DOI → ...`
-Captures semantic co-occurrence patterns between papers sharing bioactivity/species labels.
-Score: `dot(h + rel_bias, t)`
-
-### EPHEN (stage3f)
-Entity-Property Heterogeneous Embedding Network (as in NatUKE):
-- Normalised graph Laplacian → heat-kernel spectral embedding (128 eigenvectors, t=5)
-- Concatenated with projected BERT text features → 256-d final embedding
-- L2-normalised output
-Score: `cosine(h + rel_bias, t)`
-
-### GraphSAGE (stage3g)
-Inductive 2-layer mean aggregator:
-- Initialised from BERT text features (768-d → 256-d)
-- Samples up to 15 neighbours per node per layer
-- Trained with max-margin link prediction loss
-- Bilinear per-relation scoring: `h^T W_r t`
-Best general inductive GNN baseline; outperforms DeepWalk-family on biomedical graphs.
-
----
 
 ## Outputs
 
