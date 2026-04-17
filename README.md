@@ -57,6 +57,8 @@ doi_texts.json
 ```bash
 pip install -r requirements.txt
 
+unzip scripts.zip
+
 # Full run: both encoders, 10 folds, all 9 models
 python run_pipeline.py
 
@@ -91,9 +93,7 @@ python run_pipeline.py --eval-only
 | `stage3e_metapath2vec.py` | **Metapath2Vec** heterogeneous graph walks |
 | `stage3f_ephen.py` | **EPHEN** spectral heat-kernel + text fusion |
 | `stage3g_graphsage.py` | **GraphSAGE** inductive neighbourhood aggregation |
-| `stage4_evaluate.py` | Scoring functions, calibration, **all** Hits@K / MRR |
-| `stage5_cv_experiment.py` | **10-fold CV loop** — trains + evaluates each fold |
-| `stage6_significance_test.py` | Wilcoxon + sign tests, saves report |
+| `stage4_evaluate.py` | Scoring functions, calibration, **all** Hits@K / MRR 
 
 ---
 
