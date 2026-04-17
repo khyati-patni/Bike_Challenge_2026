@@ -1,8 +1,5 @@
 # BiKE v2 — Biomedical Information Knowledge Extraction, v2
 
-A scientifically rigorous pipeline that **beats NatUKE EPHEN on all 5 tasks**
-and reports statistically sound **mean ± std over 10 folds** (matching NatUKE's
-own evaluation protocol).
 
 ---
 
