@@ -14,9 +14,11 @@ Link for full repo : https://drive.google.com/drive/folders/1YQ1FWoT9Qpf0Ml7-5Sn
 ## Architecture
 
 ```
+
 doi_texts.json
      │
-     ▼ Stage 1
+     ▼ Stage 0 ( Fetch abstracts, put in scripts folder)
+  Stage 1
   SciBERT ──── doi_embeddings.npy      ─────┐
   PubMedBERT ─ doi_embeddings.npy           │
                label_embeddings.npy         │
